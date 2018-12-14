@@ -1,7 +1,11 @@
-# 2.1.1[TODO]
-支持从历史数据中寻找最优点击路径  
-支持web  
-支持游戏app遍历  
+# 2.2.0 [TODO]
+- 支持从历史数据中寻找最优点击路径
+- 支持web
+- 支持游戏app遍历
+- 使用节点树模型
+
+# 2.1.2
+- 跟进支持appium 1.7[完成]
 
 # 2.1.0
 ### bugfix
@@ -29,7 +33,10 @@ testcase:
     then:
     - //*[contains(@text, "港股")]
 ```
-
+所有的xpath的设置都支持如下三种形式
+- xpath //*[contains(@resource-id, 'ddd')]
+- regex ^确定$ 
+- contains关系 取消 确定
 # 2.0.0
 支持macaca[完成]  
 失败重试[完成]  

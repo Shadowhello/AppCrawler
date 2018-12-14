@@ -144,6 +144,7 @@ class Crawler extends CommonLog {
     //driver.manage().logs().getAvailableLogTypes().toArray.foreach(log.info)
     //设定结果目录
     runStartupScript()
+    println("append current app name to appWhiteList")
     conf.appWhiteList.append(appNameRecord.last().toString)
 
     if(conf.testcase!=null){
@@ -209,7 +210,7 @@ class Crawler extends CommonLog {
 
     //爬虫结束
     stop()
-
+    sys.exit()
   }
 
   def restart(): Unit = {
@@ -218,6 +219,8 @@ class Crawler extends CommonLog {
     log.info("set app to null to restart appium")
     conf.capability ++= Map("app"->"")
     setupAppium()
+    //todo: 采用轮询
+    Thread.sleep(8000)
     refreshPage()
     doElementAction(URIElement(s"${currentUrl}", "", "", "",
       s"restart-${store.clickedElementsList.size}"), "")
@@ -350,9 +353,12 @@ class Crawler extends CommonLog {
     URIElement(currentUrl, tag, id, name, loc)
   }
 
-  def isBackApp(): Boolean = {
+  def needBackApp(): Boolean = {
+    log.trace(conf.appWhiteList)
+    log.trace(appNameRecord.last(10))
+
     //跳到了其他app. 排除点一次就没有的弹框
-    if (conf.appWhiteList.forall(appNameRecord.last().toString.matches(_)==false) && appNameRecord.last(2).distinct.size>1) {
+    if (conf.appWhiteList.forall(appNameRecord.last().toString.matches(_)==false)) {
       log.warn(s"not in app white list ${conf.appWhiteList}")
       log.warn(s"jump to other app appName=${appNameRecord.last()} lastAppName=${appNameRecord.pre()}")
       setElementAction("backApp")
@@ -363,7 +369,7 @@ class Crawler extends CommonLog {
 
   }
 
-  def isExit(): Boolean = {
+  def needExit(): Boolean = {
     //超时退出
     if ((new Date().getTime - startTime) > conf.maxTime * 1000) {
       log.warn("maxTime out Quit need exit")
@@ -381,7 +387,7 @@ class Crawler extends CommonLog {
     return false
   }
 
-  def isReturn(): Boolean = {
+  def needReturn(): Boolean = {
     //url黑名单
     if (conf.urlBlackList.exists(urlStack.head.matches(_))) {
       log.warn(s"${urlStack.head} in urlBlackList should return")
@@ -437,19 +443,34 @@ class Crawler extends CommonLog {
   }
 
   def isSmall(m: immutable.Map[String, Any]): Boolean ={
+
+    var res=false
+    //todo: support ios
     if(m.getOrElse("bounds", "").toString.nonEmpty){
       val bounds="\\d+".r().findAllIn(m.get("bounds").get.toString).matchData.map(_.group(0)).toList
-      val width=bounds(2).toInt-bounds(0).toInt
-      val height=bounds(3).toInt-bounds(1).toInt
-      //高度小就跳过
-      if(height<50){
-        true
-      }else{
-        false
+      val startX=bounds(0).toInt
+      val startY=bounds(1).toInt
+      val endX=bounds(2).toInt
+      val endY=bounds(3).toInt
+      val width=endX-startX
+      val height=endY-startY
+
+      if(endY>driver.screenHeight || endX>driver.screenWidth){
+        log.info(bounds)
+        log.info(driver.screenHeight)
+        log.info("not visual")
+        res=true
       }
-    }else{
-      false
+
+      //高度小就跳过
+      if(height<30 && width<30) {
+        log.info(bounds)
+        log.info(driver.screenHeight)
+        log.info("small")
+        res=true
+      }
     }
+    res
   }
 
   //todo: 支持xpath表达式
@@ -459,10 +480,6 @@ class Crawler extends CommonLog {
     var lastElements = List[immutable.Map[String, Any]]()
     var selectedElements = List[immutable.Map[String, Any]]()
     var blackElements = List[immutable.Map[String, Any]]()
-
-    val allElements = driver.getListFromXPath("//*")
-    log.trace(s"all node size = ${allElements.size}")
-    allElements.foreach(log.trace)
 
     conf.selectedList.foreach(xpath => {
       log.trace(s"selectedList xpath =  ${xpath}")
@@ -475,10 +492,9 @@ class Crawler extends CommonLog {
 
     //remove blackList
     conf.blackList.foreach(xpath => {
-      log.info(s"blackList check xpath = ${xpath}")
       val temp = driver.getListFromXPath(xpath)
       temp.foreach(x=>
-        log.info(s"blackList hit  ${x}")
+        log.info(s"blackList hit ${xpath} ${x}")
       )
       blackElements ++= temp
     })
@@ -488,8 +504,8 @@ class Crawler extends CommonLog {
     selectedElements.map(_.getOrElse("xpath", "no xpath")).foreach(log.trace)
 
     //exclude small
-    selectedElements=selectedElements.filter(isValid)
-    log.info(s"all - small - non valid elements size = ${selectedElements.size}")
+    selectedElements=selectedElements.filter(isSmall(_)==false)
+    log.info(s"all - small elements size = ${selectedElements.size}")
     selectedElements.map(_.getOrElse("xpath", "no xpath")).foreach(log.trace)
 
     //sort
@@ -684,10 +700,10 @@ class Crawler extends CommonLog {
     allElements.foreach(log.debug)
 
     allElements = allElements.filter(!store.isSkiped(_))
-    log.info(s"fresh elements size=${allElements.length}")
+    log.info(s"all - skiped fresh elements size=${allElements.length}")
     //记录未被点击的元素
     allElements.foreach(e => {
-      log.debug(e)
+      log.trace(e)
       store.saveElement(e)
     })
     allElements
@@ -714,7 +730,7 @@ class Crawler extends CommonLog {
     //判断下一步动作
 
     //是否应该退出
-    if (isExit()) {
+    if (needExit()) {
       log.warn("get signal to exit")
       return
     }
@@ -729,7 +745,7 @@ class Crawler extends CommonLog {
     }
 
     //是否需要回退到app
-    if (isBackApp()) {
+    if (needBackApp()) {
       nextElement = Some(URIElement(s"${currentUrl}", "", "", "",
         s"backApp-${appNameRecord.last()}-${store.clickedElementsList.size}"))
       setElementAction("backApp")
@@ -749,7 +765,7 @@ class Crawler extends CommonLog {
 
     //判断是否需要返回上层
     if (nextElement == None) {
-      if (isReturn()) {
+      if (needReturn()) {
         log.info("need to back")
         nextElement = getBackButton()
         setElementAction("back")
@@ -963,11 +979,20 @@ class Crawler extends CommonLog {
         back()
       }
       case "backApp" => {
-        if (conf.defaultBackAction.size > 0) {
+        driver.launchApp()
+        //todo: 改进等待
+        Thread.sleep(8000)
+        /*if (conf.defaultBackAction.size > 0) {
+          log.trace(conf.defaultBackAction)
           conf.defaultBackAction.foreach(Runtimes.eval)
         } else {
           driver.backApp()
-        }
+          driver.getPageSource()
+          if(needReturn()){
+            driver.launchApp()
+          }
+
+        }*/
       }
       case "monkey" => {
         driver.event(element.name.toInt)
@@ -1101,19 +1126,15 @@ class Crawler extends CommonLog {
         }
       }
       log.info("generate report finish")
-      sys.exit()
     }
   }
 
   def handleCtrlC(): Unit = {
     log.info("add shutdown hook")
-    Signal.handle(new Signal("INT"), new SignalHandler() {
-      def handle(sig: Signal) {
-        log.info("exit by INT")
-        signalInt += 1
-        stop()
-        sys.exit(1)
-      }
+    Signal.handle(new Signal("INT"), (sig: Signal) => {
+      log.info("exit by INT")
+      signalInt += 1
+      stop()
     })
   }
 }

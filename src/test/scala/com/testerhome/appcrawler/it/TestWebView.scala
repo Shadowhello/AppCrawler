@@ -2,11 +2,13 @@ package com.testerhome.appcrawler.it
 
 import java.net.URL
 
-import com.testerhome.appcrawler.RichData
+import com.testerhome.appcrawler.XPathUtil
+import io.appium.java_client.TouchAction
 import io.appium.java_client.android.AndroidDriver
 import org.openqa.selenium.{By, WebElement}
-import org.openqa.selenium.remote.{RemoteWebDriver, DesiredCapabilities}
+import org.openqa.selenium.remote.{DesiredCapabilities, RemoteWebDriver}
 import org.scalatest.FunSuite
+
 import collection.JavaConversions._
 
 /**
@@ -30,21 +32,12 @@ class TestWebView extends FunSuite{
     val driver=new AndroidDriver[WebElement](new URL(url), capability)
     Thread.sleep(3000)
     var xml=driver.getPageSource
-    println(RichData.toPrettyXML(xml))
+    println(XPathUtil.toPrettyXML(xml))
     driver.getContextHandles.toArray.foreach(x=>println(x))
     //driver.context("WEBVIEW_com.ihealthlabs.ijiankang.patient.android")
     val size=driver.manage().window().getSize
-    driver.swipe( (size.width*0.9).toInt, (size.height*0.5).toInt,
-      (size.width*0.1).toInt, (size.height*0.5).toInt, 2000)
-
-    driver.swipe( (size.width*0.9).toInt, (size.height*0.5).toInt,
-      (size.width*0.1).toInt, (size.height*0.5).toInt, 2000)
-
-    driver.swipe( (size.width*0.9).toInt, (size.height*0.5).toInt,
-      (size.width*0.1).toInt, (size.height*0.5).toInt, 2000)
-
     xml=driver.getPageSource
-    println(RichData.toPrettyXML(xml))
+    println(XPathUtil.toPrettyXML(xml))
     driver.getContextHandles.toArray.foreach(x=>println(x))
 
     driver.findElements(By.xpath("//*")).foreach(x=>{

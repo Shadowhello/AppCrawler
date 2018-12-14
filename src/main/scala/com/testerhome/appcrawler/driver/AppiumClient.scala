@@ -3,11 +3,12 @@ package com.testerhome.appcrawler.driver
 import java.awt.{BasicStroke, Color}
 import java.io.File
 import java.net.URL
+import java.time.Duration
 import javax.imageio.ImageIO
 
 import com.testerhome.appcrawler.{AppCrawler, CommonLog, DataObject, URIElement}
 import com.testerhome.appcrawler._
-import io.appium.java_client.AppiumDriver
+import io.appium.java_client.{AppiumDriver, TouchAction}
 import io.appium.java_client.android.AndroidDriver
 import io.appium.java_client.ios.IOSDriver
 import org.apache.log4j.Level
@@ -219,10 +220,14 @@ class AppiumClient extends CommonLog with WebBrowser with WebDriver{
     if(screenHeight<=0){
       getDeviceInfo()
     }
-    retry(driver.swipe(
-      (screenWidth * startX).toInt, (screenHeight * startY).toInt,
-      (screenWidth * endX).toInt, (screenHeight * endY).toInt, 2000
-    )
+    retry(
+      driver.performTouchAction(
+        new TouchAction(driver)
+          .press((screenWidth * startX).toInt, (screenHeight * startY).toInt)
+          .moveTo((screenWidth * (endX-startX)).toInt, (screenHeight * (endY-startY)).toInt)
+          //.waitAction(Duration.ofSeconds(1))
+          .release()
+      )
     )
   }
 
@@ -270,12 +275,12 @@ class AppiumClient extends CommonLog with WebBrowser with WebDriver{
   }*/
 
   override def tap(): this.type = {
-    driver.tap(1, currentElement, 100)
+    driver.performTouchAction(new TouchAction(driver).tap(currentElement))
     this
   }
 
   override def longTap(): this.type = {
-    driver.tap(1, currentElement, 3000)
+    driver.performTouchAction(new TouchAction(driver).longPress(currentElement))
     this
   }
 
@@ -297,6 +302,7 @@ class AppiumClient extends CommonLog with WebBrowser with WebDriver{
   override def getPageSource(): String = {
     currentPageSource=null
     currentPageDom=null
+    log.info("start to get page source from appium")
     //获取页面结构, 最多重试3次
     1 to 3 foreach (i => {
       asyncTask(20)(driver.getPageSource) match {
@@ -313,7 +319,7 @@ class AppiumClient extends CommonLog with WebBrowser with WebDriver{
               xml
             }
           }
-          Try(RichData.toDocument(xmlStr)) match {
+          Try(XPathUtil.toDocument(xmlStr)) match {
             case Success(v) => {
               currentPageDom = v
             }
@@ -324,11 +330,11 @@ class AppiumClient extends CommonLog with WebBrowser with WebDriver{
             }
           }
 
-          currentPageSource = RichData.toPrettyXML(xmlStr)
+          currentPageSource = XPathUtil.toPrettyXML(xmlStr)
           return currentPageSource
         }
         case None => {
-          log.trace("get page source error")
+          log.warn("get page source error")
         }
       }
     })
@@ -450,6 +456,9 @@ class AppiumClient extends CommonLog with WebBrowser with WebDriver{
     currentElement.sendKeys(content)
   }
 
+  override def launchApp(): Unit = {
+    driver.launchApp()
+  }
 
 
 }

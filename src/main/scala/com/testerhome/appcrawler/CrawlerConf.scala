@@ -5,8 +5,6 @@ import java.io.File
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import org.json4s.native.Serialization._
-import org.json4s.{DefaultFormats, FieldSerializer}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -24,7 +22,7 @@ class CrawlerConf {
   var reportTitle = ""
   var screenshotTimeout = 20
   var currentDriver = "Android"
-  var tagLimitMax = 6
+  var tagLimitMax = 3
   var tagLimit = ListBuffer[Map[String, Any]]()
   //var tagLimit=scala.collection.mutable.Map[String, Int]()
   var showCancel = false
@@ -100,10 +98,10 @@ class CrawlerConf {
   var testcase=TestCase(
     name="TesterHome AppCrawler",
     steps = List(
-      Step(given = null, when = null, xpath="//*", action = "driver.swipe(0.9, 0,5, 0.1, 0.5)", then=null),
-      Step(given = null, when = null, xpath="//*", action = "driver.swipe(0.9, 0,5, 0.1, 0.5)", then=null),
-      Step(given = null, when = null, xpath="//*", action = "driver.swipe(0.9, 0,5, 0.1, 0.5)", then=null),
-      Step(given = null, when = null, xpath="//*", action = "driver.swipe(0.9, 0,5, 0.1, 0.5)", then=null)
+      Step(given = null, when = null, xpath="//*", action = "driver.swipe(0.9, 0.5, 0.1, 0.5)", then=null),
+      Step(given = null, when = null, xpath="//*", action = "driver.swipe(0.9, 0.5, 0.1, 0.5)", then=null),
+      Step(given = null, when = null, xpath="//*", action = "driver.swipe(0.9, 0.5, 0.1, 0.5)", then=null),
+      Step(given = null, when = null, xpath="//*", action = "driver.swipe(0.9, 0.5, 0.1, 0.5)", then=null)
     )
   )
 
@@ -115,11 +113,10 @@ class CrawlerConf {
 
 
   def loadByJson4s(file: String): Option[this.type] = {
-    implicit val formats = DefaultFormats + FieldSerializer[this.type]()
     if (new java.io.File(file).exists()) {
       println(s"load config from ${file}")
       println(Source.fromFile(file).mkString)
-      Some(read[this.type](Source.fromFile(file).mkString))
+      Some(TData.fromYaml[this.type](Source.fromFile(file).mkString))
     } else {
       println(s"conf file ${file} no exist ")
       None
